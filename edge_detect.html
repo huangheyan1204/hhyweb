@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>偏导数与边缘检测 - 手机实验</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            padding: 12px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 550px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            padding: 16px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            font-size: 1.4rem;
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            background: #f8f9fa;
+            transition: all 0.2s;
+        }
+        
+        .upload-area:active {
+            background: #e8f4fd;
+        }
+        
+        .upload-area span {
+            font-size: 2rem;
+        }
+        
+        .btn {
+            background: #3498db;
+            border: none;
+            border-radius: 30px;
+            padding: 12px 20px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+        
+        .btn:active {
+            transform: scale(0.97);
+            background: #2980b9;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .image-card {
+            text-align: center;
+        }
+        
+        .image-card p {
+            font-size: 0.7rem;
+            margin: 5px 0;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        canvas {
+            width: 100%;
+            background: #f0f0f0;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .slider-container {
+            margin: 15px 0;
+        }
+        
+        .slider-container label {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 8px 0;
+        }
+        
+        .formula {
+            background: #f0f4f8;
+            padding: 10px;
+            border-radius: 12px;
+            font-family: monospace;
+            font-size: 0.7rem;
+            text-align: center;
+            color: #2c3e50;
+        }
+        
+        .status {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #27ae60;
+            margin-top: 8px;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 0.6rem;
+            color: rgba(255,255,255,0.7);
+            margin-top: 15px;
+        }
+        
+        @media (max-width: 500px) {
+            .image-grid {
+                gap: 6px;
+            }
+            .card {
+                padding: 12px;
+            }
+            h1 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>🔬 偏导数与边缘检测实验</h1>
+        <div class="subtitle">上传照片，观察梯度 | 数学原理：∇f = (∂f/∂x, ∂f/∂y)</div>
+    </div>
+    
+    <div class="card">
+        <div class="upload-area" id="uploadArea">
+            <span>📸</span>
+            <p>点击上传照片<br><small>或拍照</small></p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        <div class="slider-container">
+            <label>🎚️ 边缘阈值 <span id="thresholdVal">0.15</span></label>
+            <input type="range" id="threshold" min="0" max="0.5" step="0.01" value="0.15">
+        </div>
+        <button class="btn" id="useExampleBtn">📷 使用示例图像</button>
+        <button class="btn btn-secondary" id="resetBtn">🔄 重置</button>
+        <div class="status" id="status">✨ 等待加载图像...</div>
+    </div>
+    
+    <div class="card">
+        <div class="image-grid">
+            <div class="image-card">
+                <p>📷 原始图像</p>
+                <canvas id="canvasOriginal" width="200" height="200"></canvas>
+            </div>
+            <div class="image-card">
+                <p>➡️ 水平边缘 ∂f/∂x</p>
+                <canvas id="canvasX" width="200" height="200"></canvas>
+            </div>
+            <div class="image-card">
+                <p>⬇️ 垂直边缘 ∂f/∂y</p>
+                <canvas id="canvasY" width="200" height="200"></canvas>
+            </div>
+            <div class="image-card">
+                <p>⭐ 梯度模 |∇f|</p>
+                <canvas id="canvasGrad" width="200" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="formula">
+            📐 梯度 = ∇f = (∂f/∂x, ∂f/∂y)<br>
+            📊 边缘强度 = |∇f| = √(f_x² + f_y²)<br>
+            🔴 红色区域 = 边缘强度大 = 可能是边缘
+        </div>
+    </div>
+    
+    <div class="footer">
+        偏导数 · 梯度 · 边缘检测 | 手机课堂实验
+    </div>
+</div>
+
+<script>
+    (function(){
+        // 获取元素
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const thresholdSlider = document.getElementById('threshold');
+        const thresholdVal = document.getElementById('thresholdVal');
+        const useExampleBtn = document.getElementById('useExampleBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const statusDiv = document.getElementById('status');
+        
+        // 画布
+        const canvasOrig = document.getElementById('canvasOriginal');
+        const canvasX = document.getElementById('canvasX');
+        const canvasY = document.getElementById('canvasY');
+        const canvasGrad = document.getElementById('canvasGrad');
+        
+        const ctxOrig = canvasOrig.getContext('2d');
+        const ctxX = canvasX.getContext('2d');
+        const ctxY = canvasY.getContext('2d');
+        const ctxGrad = canvasGrad.getContext('2d');
+        
+        // 存储当前图像数据
+        let currentImageData = null;
+        let currentWidth = 0, currentHeight = 0;
+        
+        // 设置画布大小为200x200（保持比例）
+        const targetSize = 200;
+        
+        // 创建示例图像（简单几何图形）
+        function createExampleImage() {
+            const size = targetSize;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // 背景 - 浅灰色
+            ctx.fillStyle = '#d0d0d0';
+            ctx.fillRect(0, 0, size, size);
+            
+            // 黑色矩形
+            ctx.fillStyle = '#202020';
+            ctx.fillRect(40, 40, 60, 80);
+            
+            // 白色圆形
+            ctx.fillStyle = '#e0e0e0';
+            ctx.beginPath();
+            ctx.arc(140, 100, 35, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // 灰色三角形
+            ctx.fillStyle = '#606060';
+            ctx.beginPath();
+            ctx.moveTo(100, 160);
+            ctx.lineTo(160, 160);
+            ctx.lineTo(130, 200);
+            ctx.fill();
+            
+            // 添加文字暗纹
+            ctx.fillStyle = '#404040';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('S', 70, 100);
+            
+            return canvas;
+        }
+        
+        // Sobel算子计算
+        function sobelEdgeDetection(imageData, width, height) {
+            // 转换为灰度
+            const gray = new Array(width * height);
+            const data = imageData.data;
+            
+            for (let i = 0; i < width * height; i++) {
+                const r = data[i*4];
+                const g = data[i*4+1];
+                const b = data[i*4+2];
+                gray[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+            }
+            
+            // Sobel算子
+            const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+            const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+            
+            const fx = new Array(width * height).fill(0);
+            const fy = new Array(width * height).fill(0);
+            const grad = new Array(width * height).fill(0);
+            let maxGrad = 0;
+            
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    let gx = 0, gy = 0;
+                    for (let ky = -1; ky <= 1; ky++) {
+                        for (let kx = -1; kx <= 1; kx++) {
+                            const val = gray[(y+ky)*width + (x+kx)];
+                            gx += val * sobelX[ky+1][kx+1];
+                            gy += val * sobelY[ky+1][kx+1];
+                        }
+                    }
+                    const idx = y * width + x;
+                    fx[idx] = gx;
+                    fy[idx] = gy;
+                    grad[idx] = Math.sqrt(gx*gx + gy*gy);
+                    if (grad[idx] > maxGrad) maxGrad = grad[idx];
+                }
+            }
+            
+            return { fx, fy, grad, maxGrad };
+        }
+        
+        // 绘制图像到画布
+        function drawToCanvas(canvas, imgData, width, height, type, threshold = 0.15) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = targetSize;
+            canvas.height = targetSize;
+            
+            const imgData2 = ctx.createImageData(targetSize, targetSize);
+            
+            if (type === 'original') {
+                // 直接绘制缩放的图像
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(imgData, 0, 0);
+                
+                ctx.drawImage(tempCanvas, 0, 0, width, height, 0, 0, targetSize, targetSize);
+                return;
+            }
+            
+            // 获取计算结果
+            const calc = window._lastCalc;
+            if (!calc) return;
+            
+            const { fx, fy, grad, maxGrad } = calc;
+            
+            // 缩放比例
+            const scaleX = width / targetSize;
+            const scaleY = height / targetSize;
+            
+            for (let py = 0; py < targetSize; py++) {
+                for (let px = 0; px < targetSize; px++) {
+                    const sx = Math.floor(px * scaleX);
+                    const sy = Math.floor(py * scaleY);
+                    const idx = sy * width + sx;
+                    
+                    let val;
+                    if (type === 'fx') {
+                        val = (fx[idx] / 255 + 1) / 2;
+                        val = Math.min(1, Math.max(0, val));
+                    } else if (type === 'fy') {
+                        val = (fy[idx] / 255 + 1) / 2;
+                        val = Math.min(1, Math.max(0, val));
+                    } else {
+                        const normGrad = grad[idx] / maxGrad;
+                        val = normGrad > threshold ? 1 : 0;
+                    }
+                    
+                    const v = Math.floor(val * 255);
+                    const pos = (py * targetSize + px) * 4;
+                    imgData2.data[pos] = v;
+                    imgData2.data[pos+1] = v;
+                    imgData2.data[pos+2] = v;
+                    imgData2.data[pos+3] = 255;
+                }
+            }
+            
+            ctx.putImageData(imgData2, 0, 0);
+        }
+        
+        // 更新所有显示
+        function updateDisplay() {
+            if (!currentImageData) return;
+            
+            const threshold = parseFloat(thresholdSlider.value);
+            
+            // 计算Sobel
+            window._lastCalc = sobelEdgeDetection(currentImageData, currentWidth, currentHeight);
+            
+            // 绘制原始图
+            drawToCanvas(canvasOrig, currentImageData, currentWidth, currentHeight, 'original');
+            
+            // 绘制水平边缘
+            drawToCanvas(canvasX, currentImageData, currentWidth, currentHeight, 'fx');
+            
+            // 绘制垂直边缘
+            drawToCanvas(canvasY, currentImageData, currentWidth, currentHeight, 'fy');
+            
+            // 绘制梯度模
+            drawToCanvas(canvasGrad, currentImageData, currentWidth, currentHeight, 'grad', threshold);
+        }
+        
+        // 加载图像
+        function loadImage(file) {
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // 限制最大尺寸为400px
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 400;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.floor(height * maxDim / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.floor(width * maxDim / height);
+                            height = maxDim;
+                        }
+                    }
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    currentImageData = ctx.getImageData(0, 0, width, height);
+                    currentWidth = width;
+                    currentHeight = height;
+                    
+                    updateDisplay();
+                    statusDiv.innerHTML = '✅ 图像已加载，观察边缘检测结果！';
+                    statusDiv.style.color = '#27ae60';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 加载示例图像
+        function loadExample() {
+            const exampleCanvas = createExampleImage();
+            const ctx = exampleCanvas.getContext('2d');
+            currentImageData = ctx.getImageData(0, 0, targetSize, targetSize);
+            currentWidth = targetSize;
+            currentHeight = targetSize;
+            
+            updateDisplay();
+            statusDiv.innerHTML = '📷 示例图像已加载 | 尝试调节阈值！';
+            statusDiv.style.color = '#27ae60';
+        }
+        
+        // 重置
+        function reset() {
+            thresholdSlider.value = '0.15';
+            thresholdVal.innerText = '0.15';
+            if (currentImageData) {
+                updateDisplay();
+            }
+            statusDiv.innerHTML = '✨ 阈值已重置 | 继续探索！';
+        }
+        
+        // 事件绑定
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                loadImage(e.target.files[0]);
+            }
+        });
+        
+        thresholdSlider.addEventListener('input', (e) => {
+            thresholdVal.innerText = e.target.value;
+            updateDisplay();
+        });
+        
+        useExampleBtn.addEventListener('click', loadExample);
+        resetBtn.addEventListener('click', reset);
+        
+        // 初始化：加载示例图像
+        loadExample();
+        
+        // 提示拍照功能
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            // 可以拍照，但为了简单，提示用户
+            console.log('支持拍照功能，用户可用相机拍照后上传');
+        }
+    })();
+</script>
+</body>
+</html>
